@@ -65,7 +65,7 @@ ggplot(df, aes(x=date, y=GPP)) +
                 ymin=-Inf, ymax=Inf), 
             fill = "red", alpha=0.2, inherit.aes=FALSE) +
  
-  geom_line(color = "#66C2A5FF", linewidth = 1) +
+  geom_line(color="#66C2A5FF", linewidth=1) +
   ylab(expression("GPP" ~ ("g C" ~ m^{-2} ~ d^{-1}))) +
   xlab(expression(' ')) +
   scale_color_manual(values=brewer.pal(3, "Set2")) +  
@@ -74,7 +74,7 @@ ggplot(df, aes(x=date, y=GPP)) +
   theme(
     legend.title=element_blank(),
     legend.position=c(0.8, 0.9),
-    legend.background=element_rect(fill = alpha("white", 0.5))
+    legend.background=element_rect(fill=alpha("white", 0.5))
   )
 
 plot(df$SPI_3)
