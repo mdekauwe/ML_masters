@@ -1,3 +1,11 @@
+####
+##  Fit a GAM and a Random forest to predict flux GPP, make a comparison plot
+##
+##  author: Martin De Kauwe
+##  date: 27th February, 2025
+##  email: mdekauwe@gmail.com
+####
+
 library(tidyverse)
 library(caret)
 library(randomForest)

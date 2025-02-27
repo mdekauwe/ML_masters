@@ -1,3 +1,11 @@
+####
+##  Fit a random forest to predict GPP, here we're testing the use of lags
+##
+##  author: Martin De Kauwe
+##  date: 27th February, 2025
+##  email: mdekauwe@gmail.com
+####
+
 library(tidyverse)
 library(caret)
 library(randomForest)
