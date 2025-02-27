@@ -32,7 +32,7 @@ df <- df %>% drop_na()
 
 
 ###
-# Random forest
+# GAM
 ###
 
 set.seed(123)  # for reproducibility
