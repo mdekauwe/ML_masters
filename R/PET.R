@@ -6,7 +6,7 @@
 ##  email: mdekauwe@gmail.com
 ####
 
-priestley_taylor_pet <- function(Rn, T, P) {
+priestley_taylor_pet <- function(Rn, Tair, P) {
   
   alpha = 1.26      # PT constant
   cp <- 1.013e-3    # Specific heat of air (MJ/kg°C)
@@ -18,16 +18,13 @@ priestley_taylor_pet <- function(Rn, T, P) {
   gamma <- (cp * P) / (epsilon * lambda)
   
   # Saturation vapor pressure (kPa)
-  es <- 0.6108 * exp((17.27 * T) / (T + 237.3))
+  es <- 0.6108 * exp((17.27 * Tair) / (Tair + 237.3))
   
   # Slope of saturation vapor pressure curve (kPa/°C)
-  delta <- (4098 * es) / ((T + 237.3)^2)
+  delta <- (4098 * es) / ((Tair+ 237.3)^2)
   
   # Priestley-Taylor PET calculation (mm/day)
-  #PET <- alpha * (delta / (delta + gamma)) * ((Rn - G) / (lambda * 1e6)) 
-  
-  # Priestley-Taylor PET calculation (mm/ time e.g. 30 min)
-  PET <- alpha * (delta / (delta + gamma)) * ((Rn - G) / (lambda * 1e6)) 
-  
-  return(PET)
+  pet <- alpha * (delta / (delta + gamma)) * ((Rn - G) / (lambda * 1e6)) * 86400
+
+  return(pet)
 }
