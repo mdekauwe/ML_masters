@@ -50,4 +50,14 @@ weekly_climatology <- rowMeans(LCC, na.rm = TRUE)
 
 plot(1:52, weekly_climatology, type='l', xlab='Week', ylab='LCC (μg/cm²)')
 
+# Create a sequence days
+daily_weeks <- seq(1, 52, by = 1/7) 
+
+# Interpolate linearly
+daily_climatology <- approx(x = weeks, y = weekly_climatology, xout = daily_weeks)$y
+
+# Plot
+plot(daily_weeks, daily_climatology, type='l', xlab='Week', ylab='LCC (μg/cm²)')
+points(weeks, weekly_climatology, col='red')  # show original weekly points
+
 nc_close(nc)
