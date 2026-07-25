@@ -1,0 +1,165 @@
+#!/usr/bin/env python
+
+import xarray as xr
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# ---------------------------------------------------------------------
+# files
+# ---------------------------------------------------------------------
+met_fn = "/Users/xj21307/research/Alice_Holt/data/UK-Ham_2002-2003_Met.nc"
+flx_fn = "/Users/xj21307/research/Alice_Holt/data/alice_holt_flux_2022.nc"
+
+def latent_heat_vaporisation(tair):
+    """Latent heat of vaporisation (J kg-1)."""
+    return (2.501 - 0.002361 * tair) * 1e6
+
+def le_to_et_mm(LE, dt=1800.0, tair=None):
+    """
+    Convert latent heat flux (W m-2) to ET (mm per timestep)
+
+    dt = 1800 is 30 min
+    """
+
+    if tair is None:
+        lv = 2.45e6  # J kg-1
+    else:
+        lv = latent_heat_vaporisation(tair)
+
+    et = LE * dt / lv
+
+    return et
+
+def calc_pet_fao56(tair, qair, sw_d, ws, lw_d, pressure):
+    """
+    Daily PET (mm day-1) using FAO56 Penman-Monteith.
+
+    Parameters
+    ----------
+    tair : degC
+    qair : kg kg-1
+    sw : MJ m-2 day-1
+         incoming shortwave radiation
+    ws : m s-1
+    pressure : kPa
+
+    Returns
+    -------
+    PET (mm day-1)
+    """
+
+    # saturation vapour pressure
+    es = 0.6108 * np.exp((17.27 * tair) / (tair + 237.3))
+
+    # actual vapour pressure
+    #ea = es * rh / 100.
+    ea = (qair * pressure) / (0.622 + 0.378 * qair)
+    delta = (4098.0 * es / ((tair + 237.3) ** 2))
+    gamma = 0.000665 * pressure
+
+    albedo = 0.23
+    Rns = (1 - albedo) * sw_d
+
+    sigma = 5.67e-8
+    epsilon = 0.97
+    tair_K = tair + 273.15
+    LWup = epsilon * sigma * tair_K**4
+
+    # convert W m-2 to MJ m-2 day-1
+    LWup = LWup * 86400.0 / 1e6
+    Rnl = lw_d - LWup
+
+    rn = Rns + Rnl
+
+
+    pet = (
+        0.408 * delta * rn
+        + gamma * (900.0 / (tair + 273.0))
+        * ws * (es - ea)
+    ) / (
+        delta + gamma * (1.0 + 0.34 * ws)
+    )
+
+    return np.maximum(pet, 0.0)
+
+
+met = xr.open_dataset(met_fn)
+flx = xr.open_dataset(flx_fn)
+
+tair_30min = met["Tair"].squeeze(drop=True) - 273.15
+tair_d = met["Tair"].squeeze(drop=True).resample(time="D").mean() - 273.15
+#rh_d = met[RH_VAR].resample(time="D").mean()
+qair_d = met["Qair"].squeeze(drop=True).resample(time="D").mean()
+wind_d = met["Wind"].squeeze(drop=True).resample(time="D").mean()
+pressure_d = (met["Psurf"].squeeze(drop=True).resample(time="D").mean() / 1000)
+
+# convert SW from W m-2 to MJ m-2 day-1
+#
+# MJ d-1 =
+# W m-2 * 86400 / 1e6
+#
+sw_d = (met["SWdown"].squeeze(drop=True).resample(time="D").mean()* 86400.0 / 1e6)
+lw_d = (met["LWdown"].squeeze(drop=True).resample(time="D").mean()* 86400.0 / 1e6)
+
+le = flx["Qle"].squeeze(drop=True)
+et_30min = le_to_et_mm(le, dt=1800, tair=tair_30min)
+
+AET_d = (et_30min.resample(time="D").sum())
+AET_d.name = "AET"
+
+
+PET_d = xr.apply_ufunc(calc_pet_fao56, tair_d, qair_d, sw_d, wind_d, lw_d,
+                       pressure_d)
+PET_d.name = "PET"
+
+AET_d, PET_d = xr.align(AET_d, PET_d)
+CWD = PET_d - AET_d
+CWD.name = "CWD"
+
+# cumulative CWD
+#CWD_cum = CWD.cumsum()
+CWD_pos = CWD.clip(min=0)
+CWD_cum = (CWD_pos.groupby("time.year").cumsum(dim="time"))
+CWD_cum.name = "CWD_cumulative"
+
+
+fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True,
+                         constrained_layout=True)
+
+#
+# Daily values
+CWD.plot(ax=axes[0], color="0.5", lw=0.8, alpha=0.8, label="Daily")
+
+# 7-day running mean
+CWD.rolling(time=7, center=True).mean().plot(ax=axes[0],color="firebrick",
+                                             lw=2, label="7-day mean",)
+
+# Shade positive deficits
+axes[0].fill_between(CWD.time, 0, CWD, where=CWD > 0, color="firebrick",
+                     alpha=0.25)
+
+axes[0].axhline(0, color="black", lw=1)
+
+axes[0].set_ylabel("Daily CWD (mm d$^{-1}$)")
+axes[0].legend(frameon=False)
+
+# Over the summer, atmospheric demand exceeded ecosystem water supply by
+# about 400 mm
+
+axes[1].fill_between(CWD_cum.time, 0, CWD_cum, color="forestgreen", alpha=0.25)
+CWD_cum.plot(ax=axes[1], color="forestgreen", lw=2.5)
+axes[1].set_ylabel("Cumulative CWD (mm)")
+
+# Highlight summers
+years = np.unique(CWD.time.dt.year)
+
+for year in years:
+
+    start = np.datetime64(f"{year}-06-01")
+    end   = np.datetime64(f"{year}-08-31")
+
+    for ax in axes:
+        ax.axvspan(start, end, color="gold", alpha=0.08, zorder=0)
+
+plt.show()
