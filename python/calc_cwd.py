@@ -5,11 +5,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# ---------------------------------------------------------------------
-# files
-# ---------------------------------------------------------------------
-met_fn = "/Users/xj21307/research/Alice_Holt/data/UK-Ham_2002-2003_Met.nc"
-flx_fn = "/Users/xj21307/research/Alice_Holt/data/alice_holt_flux_2022.nc"
+
+
 
 def latent_heat_vaporisation(tair):
     """Latent heat of vaporisation (J kg-1)."""
@@ -84,6 +81,13 @@ def calc_pet_fao56(tair, qair, sw_d, ws, lw_d, pressure):
     return np.maximum(pet, 0.0)
 
 
+
+
+
+
+
+met_fn = "/Users/xj21307/research/Alice_Holt/data/UK-Ham_2002-2003_Met.nc"
+flx_fn = "/Users/xj21307/research/Alice_Holt/data/alice_holt_flux_2022.nc"
 met = xr.open_dataset(met_fn)
 flx = xr.open_dataset(flx_fn)
 
@@ -94,20 +98,18 @@ qair_d = met["Qair"].squeeze(drop=True).resample(time="D").mean()
 wind_d = met["Wind"].squeeze(drop=True).resample(time="D").mean()
 pressure_d = (met["Psurf"].squeeze(drop=True).resample(time="D").mean() / 1000)
 
-# convert SW from W m-2 to MJ m-2 day-1
-#
+
+# convert from W m-2 to MJ m-2 day-1
 # MJ d-1 =
 # W m-2 * 86400 / 1e6
-#
 sw_d = (met["SWdown"].squeeze(drop=True).resample(time="D").mean()* 86400.0 / 1e6)
 lw_d = (met["LWdown"].squeeze(drop=True).resample(time="D").mean()* 86400.0 / 1e6)
 
-le = flx["Qle"].squeeze(drop=True)
+le = flx["Qle"].squeeze(drop=True) # keep in 30 mins
 et_30min = le_to_et_mm(le, dt=1800, tair=tair_30min)
 
 AET_d = (et_30min.resample(time="D").sum())
 AET_d.name = "AET"
-
 
 PET_d = xr.apply_ufunc(calc_pet_fao56, tair_d, qair_d, sw_d, wind_d, lw_d,
                        pressure_d)
@@ -127,8 +129,7 @@ CWD_cum.name = "CWD_cumulative"
 fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True,
                          constrained_layout=True)
 
-#
-# Daily values
+
 CWD.plot(ax=axes[0], color="0.5", lw=0.8, alpha=0.8, label="Daily")
 
 # 7-day running mean
