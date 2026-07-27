@@ -4,9 +4,7 @@ import xarray as xr
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
-
-
+import sys
 
 def latent_heat_vaporisation(tair):
     """Latent heat of vaporisation (J kg-1)."""
@@ -27,6 +25,39 @@ def le_to_et_mm(LE, dt=1800.0, tair=None):
     et = LE * dt / lv
 
     return et
+
+
+
+def calc_pet_priestley_taylor(tair, pressure, rn):
+    """
+    Priestley-Taylor potential ET.
+    """
+
+    alpha = 1.26
+    cp = 1.013e-3      # MJ kg-1 degC-1
+    epsilon = 0.622
+
+    G = 0.0            # Daily ground heat flux assumed negligible
+
+    if tair is None:
+        lam = 2.45         # MJ kg-1
+    else:
+        lam = 2.501 - 0.002361 * tair    # MJ kg-1
+
+
+
+    # Psychrometric constant (kPa degC-1)
+    gamma = (cp * pressure) / (epsilon * lam)
+
+    # Saturation vapour pressure (kPa)
+    es = 0.6108 * np.exp((17.27 * tair) / (tair + 237.3))
+
+    # Slope of saturation vapour pressure curve (kPa degC-1)
+    delta = (4098.0 * es) / ((tair + 237.3) ** 2)
+
+    pet = alpha * (delta / (delta + gamma)) * ((rn - G) / lam)
+
+    return np.maximum(pet, 0.0)
 
 def calc_pet_fao56(tair, qair, sw_d, ws, lw_d, pressure):
     """
@@ -55,7 +86,7 @@ def calc_pet_fao56(tair, qair, sw_d, ws, lw_d, pressure):
     delta = (4098.0 * es / ((tair + 237.3) ** 2))
     gamma = 0.000665 * pressure
 
-    albedo = 0.23
+    albedo = 0.15
     Rns = (1 - albedo) * sw_d
 
     sigma = 5.67e-8
@@ -68,6 +99,7 @@ def calc_pet_fao56(tair, qair, sw_d, ws, lw_d, pressure):
     Rnl = lw_d - LWup
 
     rn = Rns + Rnl
+
 
 
     pet = (
@@ -84,12 +116,12 @@ def calc_pet_fao56(tair, qair, sw_d, ws, lw_d, pressure):
 
 
 
-
-
 met_fn = "/Users/xj21307/research/Alice_Holt/data/UK-Ham_2002-2003_Met.nc"
 flx_fn = "/Users/xj21307/research/Alice_Holt/data/alice_holt_flux_2022.nc"
 met = xr.open_dataset(met_fn)
 flx = xr.open_dataset(flx_fn)
+
+
 
 tair_30min = met["Tair"].squeeze(drop=True) - 273.15
 tair_d = met["Tair"].squeeze(drop=True).resample(time="D").mean() - 273.15
@@ -111,13 +143,33 @@ et_30min = le_to_et_mm(le, dt=1800, tair=tair_30min)
 AET_d = (et_30min.resample(time="D").sum())
 AET_d.name = "AET"
 
-PET_d = xr.apply_ufunc(calc_pet_fao56, tair_d, qair_d, sw_d, wind_d, lw_d,
-                       pressure_d)
+
+albedo = 0.15
+#albedo = 0.23 # grass
+Rns = (1.0 - albedo) * sw_d
+
+sigma = 5.67e-8
+epsilon = 0.97
+tair_K = tair_d + 273.15
+
+LWup = epsilon * sigma * tair_K**4
+LWup = LWup * 86400.0 / 1e6  # MJ m-2 day-1
+
+Rn = Rns + (lw_d - LWup)
+#Rn.groupby("time.month").mean().plot()
+
+PET_d = xr.apply_ufunc(calc_pet_priestley_taylor, tair_d, pressure_d, Rn)
+PET_d.name = "PET"
+
+#PET_d = xr.apply_ufunc(calc_pet_fao56, tair_d, qair_d, sw_d, wind_d, lw_d,
+#                       pressure_d)
 PET_d.name = "PET"
 
 AET_d, PET_d = xr.align(AET_d, PET_d)
 CWD = PET_d - AET_d
-CWD.name = "CWD"
+#CWD_plot = CWD.clip(min=0)
+CWD_plot = CWD
+CWD_plot.name = "CWD"
 
 # cumulative CWD
 #CWD_cum = CWD.cumsum()
@@ -125,19 +177,29 @@ CWD_pos = CWD.clip(min=0)
 CWD_cum = (CWD_pos.groupby("time.year").cumsum(dim="time"))
 CWD_cum.name = "CWD_cumulative"
 
+"""
+ig, ax = plt.subplots(figsize=(10,4))
+
+PET_d.plot(ax=ax, label="PET")
+AET_d.plot(ax=ax, label="AET")
+
+ax.legend()
+plt.show()
+sys.exit()
+"""
 
 fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True,
                          constrained_layout=True)
 
 
-CWD.plot(ax=axes[0], color="0.5", lw=0.8, alpha=0.8, label="Daily")
+CWD_plot.plot(ax=axes[0], color="0.5", lw=0.8, alpha=0.8, label="Daily")
 
 # 7-day running mean
-CWD.rolling(time=7, center=True).mean().plot(ax=axes[0],color="firebrick",
+CWD_plot.rolling(time=7, center=True).mean().plot(ax=axes[0],color="firebrick",
                                              lw=2, label="7-day mean",)
 
 # Shade positive deficits
-axes[0].fill_between(CWD.time, 0, CWD, where=CWD > 0, color="firebrick",
+axes[0].fill_between(CWD_plot.time, 0, CWD, where=CWD > 0, color="firebrick",
                      alpha=0.25)
 
 axes[0].axhline(0, color="black", lw=1)
