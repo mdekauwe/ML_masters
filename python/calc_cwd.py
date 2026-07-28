@@ -14,7 +14,17 @@ import matplotlib.pyplot as plt
 import sys
 
 def latent_heat_vaporisation(tair):
-    """Latent heat of vaporisation (MJ kg-1)."""
+    """
+    Latent heat of vaporisation (MJ kg-1)
+
+    Parameters
+    ----------
+    tair : degC
+
+    Returns
+    -------
+    lv (MJ kg-1)
+    """
     return (2.501 - 0.002361 * tair)
 
 def le_to_et_mm(LE, dt=1800.0, tair=None):
@@ -22,6 +32,15 @@ def le_to_et_mm(LE, dt=1800.0, tair=None):
     Convert latent heat flux (W m-2) to ET (mm per timestep)
 
     dt = 1800 is 30 min
+
+    Parameters
+    ----------
+    LE : W m-2
+
+    Returns
+    -------
+    et : mm per timestep
+
     """
 
     if tair is None:
