@@ -49,9 +49,9 @@ def calc_pet_priestley_taylor(tair, pressure, rn):
 
     """
 
-    alpha = 1.26
+    alpha = 1.26       # PT constant
     cp = 1.013e-3      # MJ kg-1 degC-1
-    epsilon = 0.622
+    epsilon = 0.622    # Ratio of molecular weights of water vapor to dry air
     G = 0.0            # Daily ground heat flux assumed negligible
 
     if tair is None:
@@ -152,13 +152,13 @@ if __name__ == "__main__":
     qair_d = met["Qair"].squeeze(drop=True).resample(time="D").mean()
     wind_d = met["Wind"].squeeze(drop=True).resample(time="D").mean()
     pressure_d = (met["Psurf"].squeeze(drop=True).resample(time="D").mean() / 1000)
-
+    sw_d = met["SWdown"].squeeze(drop=True).resample(time="D").mean()
+    lw_d = met["LWdown"].squeeze(drop=True).resample(time="D").mean()
 
     # convert from W m-2 to MJ m-2 day-1
     # MJ d-1 = W m-2 * 86400 / 1e6
-    sw_d = (met["SWdown"].squeeze(drop=True).resample(time="D").mean() * 86400.0 / 1e6)
-    lw_d = (met["LWdown"].squeeze(drop=True).resample(time="D").mean() * 86400.0 / 1e6)
-
+    sw_d *= 86400.0 / 1e6
+    lw_d *= 86400.0 / 1e6
 
     le = flx["Qle"].squeeze(drop=True) # keep in 30 mins
     et_30min = le_to_et_mm(le, dt=1800, tair=tair_30min) #dt=30min=1800
