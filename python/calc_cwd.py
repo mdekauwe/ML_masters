@@ -90,13 +90,17 @@ def calc_pet_fao56(tair, qair, sw_d, ws, lw_d, pressure, rn):
     PET (mm day-1)
     """
 
-    # saturation vapour pressure
+    # saturation vapour pressure (kPa)
     es = 0.6108 * np.exp((17.27 * tair) / (tair + 237.3))
 
     # actual vapour pressure
     #ea = es * rh / 100.
     ea = (qair * pressure) / (0.622 + 0.378 * qair)
+
+    # Slope of saturation vapor pressure curve (kPa/degC)
     delta = (4098.0 * es / ((tair + 237.3) ** 2))
+
+    # Psychrometric constant (kPa degC-1)
     gamma = 0.000665 * pressure
 
     # mm day-1
