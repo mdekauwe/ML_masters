@@ -150,19 +150,30 @@ if __name__ == "__main__":
     flx = xr.open_dataset(flx_fn)
 
 
-    tair_30min = met["Tair"].squeeze(drop=True) - 273.15
-    tair_d = met["Tair"].squeeze(drop=True).resample(time="D").mean() - 273.15
+    tair_30min = met["Tair"].squeeze(drop=True)
+    tair_d = met["Tair"].squeeze(drop=True).resample(time="D").mean()
     #rh_d = met[RH_VAR].resample(time="D").mean()
     qair_d = met["Qair"].squeeze(drop=True).resample(time="D").mean()
     wind_d = met["Wind"].squeeze(drop=True).resample(time="D").mean()
-    pressure_d = (met["Psurf"].squeeze(drop=True).resample(time="D").mean() / 1000)
+    pressure_d = met["Psurf"].squeeze(drop=True).resample(time="D").mean()
     sw_d = met["SWdown"].squeeze(drop=True).resample(time="D").mean()
     lw_d = met["LWdown"].squeeze(drop=True).resample(time="D").mean()
+
+    #
+    ## Unit conversion
+    #
 
     # convert from W m-2 to MJ m-2 day-1
     # MJ d-1 = W m-2 * 86400 / 1e6
     sw_d *= 86400.0 / 1e6
     lw_d *= 86400.0 / 1e6
+
+    # Pa to kPa
+    pressure_d /= 1000
+
+    # K to C
+    tair_30min -= 273.15
+    tair_d -= 273.15
 
     le = flx["Qle"].squeeze(drop=True) # keep in 30 mins
     et_30min = le_to_et_mm(le, dt=1800, tair=tair_30min) #dt=30min=1800
@@ -210,22 +221,18 @@ if __name__ == "__main__":
     CWD_plot.plot(ax=axes[0], color="0.5", lw=0.8, alpha=0.8, label="Daily")
 
     # 7-day running mean
-    CWD_plot.rolling(time=7, center=True).mean().plot(ax=axes[0],color="firebrick",
-                                                 lw=2, label="7-day mean",)
+    CWD_plot.rolling(time=7, center=True).mean().plot(ax=axes[0],
+                                                      color="firebrick",
+                                                      lw=2, label="7-day mean")
 
     # Shade positive deficits
-    axes[0].fill_between(CWD_plot.time, 0, CWD, where=CWD > 0, color="firebrick",
-                         alpha=0.25)
-
+    axes[0].fill_between(CWD_plot.time, 0, CWD, where=CWD > 0,
+                         color="firebrick", alpha=0.25)
     axes[0].axhline(0, color="black", lw=1)
-
     axes[0].set_ylabel("Daily CWD (mm d$^{-1}$)")
     axes[0].legend(frameon=False)
-
-    # Over the summer, atmospheric demand exceeded ecosystem water supply by
-    # about 400 mm
-
-    axes[1].fill_between(CWD_cum.time, 0, CWD_cum, color="forestgreen", alpha=0.25)
+    axes[1].fill_between(CWD_cum.time, 0, CWD_cum, color="forestgreen",
+                         alpha=0.25)
     CWD_cum.plot(ax=axes[1], color="forestgreen", lw=2.5)
     axes[1].set_ylabel("Cumulative CWD (mm)")
 
@@ -235,7 +242,7 @@ if __name__ == "__main__":
     for year in years:
 
         start = np.datetime64(f"{year}-06-01")
-        end   = np.datetime64(f"{year}-08-31")
+        end = np.datetime64(f"{year}-08-31")
 
         for ax in axes:
             ax.axvspan(start, end, color="gold", alpha=0.08, zorder=0)
